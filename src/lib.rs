@@ -15,11 +15,19 @@ pub(self) const ATTRIBUTE_TEXTURE_ARRAY_INDEX: MeshVertexAttribute =
     MeshVertexAttribute::new("TextureArrayIndex", 584807746, VertexFormat::Sint32);
 
 #[derive(Clone, Copy, Component, Debug, Reflect)]
-pub struct BillboardDepth(pub bool);
+pub struct BillboardSettings {
+    pub depth: bool,
+    pub bounds: Vec4,
+    pub enable_bounds: bool,
+}
 
-impl Default for BillboardDepth {
+impl Default for BillboardSettings {
     fn default() -> Self {
-        Self(true)
+        Self{
+            depth: true,
+            bounds: Vec4::default(),
+            enable_bounds: false,
+        }
     }
 }
 
@@ -44,7 +52,7 @@ pub struct BillboardTextureBundle {
     pub visibility: Visibility,
     pub inherited_visibility: InheritedVisibility,
     pub view_visibility: ViewVisibility,
-    pub billboard_depth: BillboardDepth,
+    pub billboard_settings: BillboardSettings,
 }
 
 #[derive(Bundle, Default)]
@@ -57,7 +65,7 @@ pub struct BillboardTextBundle {
     pub visibility: Visibility,
     pub inherited_visibility: InheritedVisibility,
     pub view_visibility: ViewVisibility,
-    pub billboard_depth: BillboardDepth,
+    pub billboard_settings: BillboardSettings,
 }
 
 pub mod prelude {

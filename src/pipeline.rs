@@ -1,5 +1,5 @@
 use crate::{
-    BillboardDepth, BillboardLockAxis, ATTRIBUTE_TEXTURE_ARRAY_INDEX, BILLBOARD_SHADER_HANDLE,
+    BillboardSettings, BillboardLockAxis, ATTRIBUTE_TEXTURE_ARRAY_INDEX, BILLBOARD_SHADER_HANDLE,
 };
 
 use bevy::{ecs::query::ROQueryItem, render::view::ViewTarget};
@@ -115,6 +115,8 @@ impl From<Handle<Mesh>> for BillboardMeshHandle {
 #[derive(Component, Clone, ShaderType)]
 pub struct BillboardUniform {
     transform: Mat4,
+    bounds: Vec4,
+    enable_bounds: u32,
 }
 
 #[derive(Resource)]
@@ -271,7 +273,7 @@ impl FromWorld for BillboardPipeline {
             label: Some("billboard_layout"),
             entries: &[BindGroupLayoutEntry {
                 binding: 0,
-                visibility: ShaderStages::VERTEX,
+                visibility: ShaderStages::VERTEX_FRAGMENT,
                 ty: BindingType::Buffer {
                     ty: BufferBindingType::Uniform,
                     has_dynamic_offset: true,
@@ -501,7 +503,7 @@ pub fn extract_billboard(
             &GlobalTransform,
             &Handle<BillboardTexture>,
             &BillboardMeshHandle,
-            &BillboardDepth,
+            &BillboardSettings,
         ), Without<BillboardLockAxis>>,
     >,
     query_lock: Extract<
@@ -511,14 +513,14 @@ pub fn extract_billboard(
             &GlobalTransform,
             &Handle<BillboardTexture>,
             &BillboardMeshHandle,
-            &BillboardDepth,
+            &BillboardSettings,
             &BillboardLockAxis,
         ), With<BillboardLockAxis>>,
     >,
 ) {
     let mut values_lockless = Vec::with_capacity(*previous_len_lockless);
 
-    for (entity, visibility, transform, texture_handle, mesh_handle, depth) in query_lockless.iter() {
+    for (entity, visibility, transform, texture_handle, mesh_handle, settings) in query_lockless.iter() {
         if !visibility.get() {
             continue;
         }
@@ -537,15 +539,15 @@ pub fn extract_billboard(
             (
                 texture_handle.clone_weak(),
                 BillboardMeshHandle(mesh_handle.0.clone_weak()),
-                BillboardUniform { transform },
-                *depth,
+                BillboardUniform { transform, bounds: settings.bounds, enable_bounds: if settings.enable_bounds { 1 } else { 0 } },
+                *settings,
             )
         ));
     }
 
     let mut values_lock = Vec::with_capacity(*previous_len_lock);
 
-    for (entity, visibility, transform, texture_handle, mesh_handle, depth, lock_axis) in
+    for (entity, visibility, transform, texture_handle, mesh_handle, settings, lock_axis) in
         query_lock.iter()
     {
         if !visibility.get() {
@@ -571,8 +573,8 @@ pub fn extract_billboard(
             (
                 texture_handle.clone_weak(),
                 BillboardMeshHandle(mesh_handle.0.clone_weak()),
-                BillboardUniform { transform },
-                *depth,
+                BillboardUniform { transform, bounds: settings.bounds, enable_bounds: if settings.enable_bounds { 1 } else { 0 } },
+                *settings,
                 *lock_axis,
             ),
         ));
@@ -650,7 +652,7 @@ pub fn queue_billboard_texture(
         &Handle<BillboardTexture>,
         &BillboardUniform,
         &BillboardMeshHandle,
-        &BillboardDepth,
+        &BillboardSettings,
         Option<&BillboardLockAxis>,
     )>,
     events: Res<SpriteAssetEvents>,
@@ -678,7 +680,7 @@ pub fn queue_billboard_texture(
                        billboard_texture_handle,
                        billboard_uniform,
                        billboard_mesh_handle,
-                       depth,
+                       settings,
                        lock_axis,
                    )) = billboards.get(*visible_entity) else { continue; };
             let Some(mesh) = render_meshes.get(&billboard_mesh_handle.0) else { continue; };
@@ -692,7 +694,7 @@ pub fn queue_billboard_texture(
 
             let mut key = BillboardPipelineKey::from_msaa_samples(msaa.samples());
 
-            if depth.0 {
+            if settings.depth {
                 key |= BillboardPipelineKey::DEPTH;
             }
 

@@ -11,6 +11,8 @@ struct View {
 
 struct Billboard {
     model: mat4x4<f32>,
+    bounds: vec4<f32>,
+    enable_bounds: u32,
 }
 
 @group(0) @binding(0)
@@ -47,12 +49,13 @@ struct VertexOutput {
 #ifdef VERTEX_TEXTURE_ARRAY
     @location(2) array_index: i32,
 #endif
+    @location(3) world_position: vec4<f32>,
 };
 
 @vertex
 fn vertex(vertex: Vertex) -> VertexOutput {
-#ifdef LOCK_ROTATION
     let vertex_position = vec4<f32>(-vertex.position.x, vertex.position.y, vertex.position.z, 1.0);
+#ifdef LOCK_ROTATION
     let position = view.view_proj * billboard.model * vertex_position;
 #else
     let camera_right = normalize(vec3<f32>(view.view_proj.x.x, view.view_proj.y.x, view.view_proj.z.x));
@@ -76,6 +79,8 @@ fn vertex(vertex: Vertex) -> VertexOutput {
     out.array_index = vertex.array_index;
 #endif
 
+    out.world_position = billboard.model * vertex_position;
+
     return out;
 }
 
@@ -87,15 +92,28 @@ struct Fragment {
 #ifdef VERTEX_TEXTURE_ARRAY
     @location(2) array_index: i32,
 #endif
+    @location(3) world_position: vec4<f32>,
 };
 
 @fragment
 fn fragment(fragment: Fragment) -> @location(0) vec4<f32> {
 #ifdef VERTEX_TEXTURE_ARRAY
-    let color = textureSample(billboard_texture, billboard_sampler, fragment.uv, fragment.array_index);
+    let color_base = textureSample(billboard_texture, billboard_sampler, fragment.uv, fragment.array_index);
 #else
-    let color = textureSample(billboard_texture, billboard_sampler, fragment.uv);
+    let color_base = textureSample(billboard_texture, billboard_sampler, fragment.uv);
 #endif
+
+    let world_position = fragment.world_position;
+    var outside_amt = 0.0;
+    if billboard.enable_bounds == 1u {
+        outside_amt = max(outside_amt, billboard.bounds.x - world_position.x);
+        outside_amt = max(outside_amt, world_position.x - billboard.bounds.z);
+        outside_amt = max(outside_amt, billboard.bounds.y - world_position.z);
+        outside_amt = max(outside_amt, world_position.z - billboard.bounds.w);
+    }
+
+    let color = vec4<f32>(color_base.rgb, saturate(color_base.a * (1.0 - outside_amt)));
+
 #ifdef VERTEX_COLOR
     return color * fragment.color;
 #else

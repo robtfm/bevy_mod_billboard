@@ -1,6 +1,6 @@
 use bevy::prelude::*;
 use bevy::prelude::shape::Cube;
-use bevy_mod_billboard::BillboardDepth;
+use bevy_mod_billboard::BillboardSettings;
 use bevy_mod_billboard::prelude::*;
 
 fn main() {
@@ -43,7 +43,7 @@ fn setup_scene(
             font: fira_sans_regular_handle.clone(),
             color: Color::WHITE,
         }).with_alignment(TextAlignment::Center),
-        billboard_depth: BillboardDepth(false),
+        billboard_settings: BillboardSettings{ depth: false, ..Default::default() },
         ..default()
     });
 
